@@ -1,0 +1,37 @@
+name: Pack Extension
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build release zip
+        run: bun run pack
+
+      - name: Publish release with asset
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: auto-main-${{ github.run_number }}
+          name: Auto Pack ${{ github.run_number }}
+          generate_release_notes: true
+          prerelease: true
+          files: x402-autopay.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

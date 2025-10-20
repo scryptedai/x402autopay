@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>X402 Autopay</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="top-bar">
+      <h1>X402 Autopay</h1>
+      <div class="status-pill">
+        <span id="status-indicator" data-status="idle" title="Idle"></span>
+        <span id="status-label">Idle</span>
+      </div>
+    </header>
+
+    <section id="wallet-section" class="card">
+      <div class="section-header">
+        <h2>Wallet</h2>
+        <div class="address-row">
+          <code id="wallet-address">(not configured)</code>
+          <button id="copy-wallet" title="Copy address" disabled>Copy</button>
+          <button id="backup-wallet" class="secondary" title="Reveal private key" disabled>Back up</button>
+        </div>
+      </div>
+
+      <p id="wallet-status" class="status-text">Wallet not configured</p>
+
+      <div id="wallet-actions">
+        <div id="wallet-configured" class="stack hidden">
+          <div class="button-row">
+            <button id="regen-wallet">Regenerate</button>
+            <button id="clear-wallet" class="danger">Remove</button>
+            <button id="lock-wallet" class="secondary hidden">Lock now</button>
+          </div>
+          <form id="unlock-form" class="stack hidden">
+            <label>
+              Passphrase
+              <input type="password" id="unlock-passphrase" autocomplete="current-password" />
+            </label>
+            <label>
+              Unlock for (minutes)
+              <input type="number" min="1" max="1440" id="unlock-duration" />
+            </label>
+            <div class="button-row">
+              <button type="submit">Unlock</button>
+            </div>
+          </form>
+          <form id="backup-form" class="stack hidden">
+            <label>
+              Passphrase
+              <input type="password" id="backup-passphrase" autocomplete="current-password" />
+            </label>
+            <div class="button-row">
+              <button type="submit">Decrypt</button>
+              <button type="button" id="backup-cancel" class="secondary">Cancel</button>
+            </div>
+          </form>
+          <div id="backup-result" class="stack hidden">
+            <label>
+              Private key
+              <textarea id="backup-private-key" readonly rows="3" spellcheck="false"></textarea>
+            </label>
+            <div class="button-row">
+              <button type="button" id="backup-copy">Copy key</button>
+              <button type="button" id="backup-close" class="secondary">Close</button>
+            </div>
+          </div>
+          <p id="backup-error" class="error hidden"></p>
+        </div>
+        <form id="wallet-seed-form" class="stack">
+          <label for="wallet-private-key">Import private key</label>
+          <textarea id="wallet-private-key" rows="2" placeholder="0x…" spellcheck="false"></textarea>
+          <label for="wallet-passphrase">Passphrase</label>
+          <input type="password" id="wallet-passphrase" autocomplete="new-password" />
+          <label for="wallet-passphrase-confirm">Confirm passphrase</label>
+          <input type="password" id="wallet-passphrase-confirm" autocomplete="new-password" />
+          <label for="wallet-lock-duration">Unlock for (minutes)</label>
+          <input type="number" min="1" max="1440" id="wallet-lock-duration" value="15" />
+          <div class="button-row">
+            <button type="submit">Save</button>
+            <button type="button" id="create-wallet" class="secondary">Create new</button>
+          </div>
+        </form>
+      </div>
+      <p id="wallet-error" class="error hidden"></p>
+    </section>
+
+    <section class="card" id="balance-section">
+      <div class="section-header">
+        <h2>Balance</h2>
+        <button id="refresh-balance" title="Refresh balance">Refresh</button>
+      </div>
+      <table id="balance-table">
+        <thead>
+          <tr>
+            <th>Network</th>
+            <th>Token</th>
+            <th>Amount</th>
+            <th>USD</th>
+            <th>Updated</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <section class="card" id="settings-section">
+      <h2>Autopay Settings</h2>
+      <form id="settings-form" class="stack">
+        <label>
+          Threshold (USD)
+          <input type="number" step="0.01" min="0" id="threshold-input" />
+        </label>
+        <label>
+          Daily cap (USD)
+          <input type="number" step="0.01" min="0" id="daily-cap-input" />
+        </label>
+        <label>
+          Network
+          <select id="chain-select">
+            <option value="polygonAmoy">Polygon Amoy (Testnet)</option>
+            <option value="polygon">Polygon Mainnet</option>
+          </select>
+        </label>
+        <label>
+          Preferred token
+          <select id="token-select">
+            <option value="USDC">USDC</option>
+          </select>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="prompt-toggle" />
+          <span>Always prompt above threshold</span>
+        </label>
+      </form>
+    </section>
+
+    <section class="card" id="policies-section">
+      <div class="section-header">
+        <h2>Site Policies</h2>
+        <button id="reset-policies" class="secondary">Reset</button>
+      </div>
+      <ul id="policy-list" class="list"></ul>
+    </section>
+
+    <section class="card" id="history-section">
+      <div class="section-header">
+        <h2>Recent Payments</h2>
+        <button id="clear-history" class="secondary">Clear</button>
+      </div>
+      <ul id="history-list" class="list"></ul>
+    </section>
+
+    <footer>
+      <small>Build <span id="build-info">-</span></small>
+    </footer>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

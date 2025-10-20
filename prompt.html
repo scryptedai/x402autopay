@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Authorize Payment</title>
+    <link rel="stylesheet" href="prompt.css" />
+  </head>
+  <body>
+    <main class="panel">
+      <header>
+        <h1>Payment request</h1>
+        <div id="prompt-status" class="status"></div>
+      </header>
+      <section>
+        <div class="row">
+          <span class="label">Website</span>
+          <span id="prompt-site" class="value">-</span>
+        </div>
+        <div class="row">
+          <span class="label">Endpoint</span>
+          <span id="prompt-endpoint" class="value">-</span>
+        </div>
+        <div class="row">
+          <span class="label">Amount</span>
+          <span id="prompt-amount" class="value">0.00</span>
+        </div>
+        <div class="row">
+          <span class="label">Token</span>
+          <span id="prompt-token" class="value">USDC</span>
+        </div>
+        <div class="row">
+          <span class="label">Wallet balance</span>
+          <span id="prompt-balance" class="value">-</span>
+        </div>
+      </section>
+
+      <p id="prompt-warning" class="warning hidden">Insufficient funds for this payment.</p>
+
+      <form id="prompt-unlock" class="stack hidden">
+        <label>
+          Passphrase
+          <input type="password" id="prompt-passphrase" autocomplete="current-password" />
+        </label>
+        <div class="actions">
+          <button type="submit">Unlock wallet</button>
+        </div>
+      </form>
+
+      <label class="toggle">
+        <input type="checkbox" id="prompt-allow" />
+        Always allow this site ≤ threshold
+      </label>
+
+      <div class="actions">
+        <button id="prompt-approve">Approve</button>
+        <button id="prompt-deny" class="secondary">Cancel</button>
+      </div>
+    </main>
+    <script type="module" src="prompt.js"></script>
+  </body>
+</html>
