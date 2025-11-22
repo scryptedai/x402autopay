@@ -25,23 +25,33 @@
     <section id="wallet-section" class="card">
       <div class="section-header">
         <h2>Wallet</h2>
-        <div class="address-row">
-          <code id="wallet-address">(not configured)</code>
-          <button id="copy-wallet" title="Copy address" disabled>Copy</button>
-          <button id="backup-wallet" class="secondary" title="Reveal private key" disabled>Back up</button>
+        <button id="wallet-settings" class="icon-button" title="Wallet settings">⚙️</button>
+      </div>
+
+      <div id="wallet-empty" class="stack">
+        <p class="status-text">No wallet configured</p>
+        <div class="button-row">
+          <button id="create-wallet-btn" class="primary">Create wallet</button>
+          <button id="import-wallet-btn" class="secondary">Import wallet</button>
         </div>
       </div>
 
-      <p id="wallet-status" class="status-text">Wallet not configured</p>
-
-      <div id="wallet-actions">
-        <div id="wallet-configured" class="stack hidden">
-          <div class="button-row">
-            <button id="regen-wallet">Regenerate</button>
-            <button id="clear-wallet" class="danger">Remove</button>
-            <button id="lock-wallet" class="secondary hidden">Lock now</button>
+      <div id="wallet-configured" class="stack hidden">
+        <div class="wallet-info">
+          <div class="wallet-status-badge" id="wallet-status-badge">
+            <span class="status-icon">🔒</span>
+            <span id="wallet-status-text">Locked</span>
           </div>
-          <form id="unlock-form" class="stack hidden">
+          <div class="address-display">
+            <code id="wallet-address-truncated" class="address-truncated">0x0000...0000</code>
+            <button id="address-expand" class="icon-button" title="Show full address">⋯</button>
+            <button id="copy-wallet" class="icon-button" title="Copy address">📋</button>
+          </div>
+          <div id="wallet-address-full" class="address-full hidden"></div>
+        </div>
+
+        <div id="unlock-section" class="stack hidden">
+          <form id="unlock-form">
             <label>
               Passphrase
               <input type="password" id="unlock-passphrase" autocomplete="current-password" />
@@ -54,45 +64,124 @@
               <button type="submit">Unlock</button>
             </div>
           </form>
-          <form id="backup-form" class="stack hidden">
+        </div>
+
+        <div id="unlocked-section" class="stack hidden">
+          <p class="status-text" id="unlock-timer">Unlocked for 15 minutes</p>
+          <button id="lock-wallet" class="secondary">Lock now</button>
+        </div>
+      </div>
+
+      <p id="wallet-error" class="error hidden"></p>
+    </section>
+
+    <div id="settings-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Wallet Settings</h2>
+          <button id="settings-close" class="icon-button">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="settings-section">
+            <h3>Security</h3>
+            <button id="backup-wallet" class="secondary">Backup wallet</button>
+            <button id="import-different-wallet" class="secondary">Import different wallet</button>
+            <button id="remove-wallet" class="danger">Remove wallet</button>
+          </div>
+          <div class="settings-section">
+            <h3>Advanced</h3>
+            <details>
+              <summary>Import private key</summary>
+              <form id="wallet-import-form" class="stack">
+                <label>
+                  Private key
+                  <textarea id="wallet-private-key" rows="2" placeholder="0x…" spellcheck="false"></textarea>
+                </label>
+                <label>
+                  Passphrase
+                  <input type="password" id="wallet-passphrase" autocomplete="new-password" />
+                </label>
+                <label>
+                  Confirm passphrase
+                  <input type="password" id="wallet-passphrase-confirm" autocomplete="new-password" />
+                </label>
+                <label>
+                  Unlock for (minutes)
+                  <input type="number" min="1" max="1440" id="wallet-lock-duration" value="15" />
+                </label>
+                <div class="button-row">
+                  <button type="submit">Import</button>
+                  <button type="button" id="import-cancel" class="secondary">Cancel</button>
+                </div>
+              </form>
+            </details>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="backup-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Backup Wallet</h2>
+          <button id="backup-modal-close" class="icon-button">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="warning-banner">
+            ⚠️ Never share your private key. Anyone with this key can access your funds.
+          </div>
+          <form id="backup-form" class="stack">
             <label>
               Passphrase
               <input type="password" id="backup-passphrase" autocomplete="current-password" />
             </label>
             <div class="button-row">
-              <button type="submit">Decrypt</button>
+              <button type="submit">Show private key</button>
               <button type="button" id="backup-cancel" class="secondary">Cancel</button>
             </div>
           </form>
           <div id="backup-result" class="stack hidden">
             <label>
               Private key
-              <textarea id="backup-private-key" readonly rows="3" spellcheck="false"></textarea>
+              <div class="private-key-container">
+                <textarea id="backup-private-key" readonly rows="3" spellcheck="false" class="masked"></textarea>
+                <button id="reveal-key" class="secondary">Reveal</button>
+              </div>
             </label>
+            <div class="warning-banner">
+              ⚠️ This key will be hidden in 30 seconds
+            </div>
             <div class="button-row">
-              <button type="button" id="backup-copy">Copy key</button>
-              <button type="button" id="backup-close" class="secondary">Close</button>
+              <button id="backup-copy">Copy key</button>
+              <button id="backup-close" class="secondary">Close</button>
             </div>
           </div>
           <p id="backup-error" class="error hidden"></p>
         </div>
-        <form id="wallet-seed-form" class="stack">
-          <label for="wallet-private-key">Import private key</label>
-          <textarea id="wallet-private-key" rows="2" placeholder="0x…" spellcheck="false"></textarea>
-          <label for="wallet-passphrase">Passphrase</label>
-          <input type="password" id="wallet-passphrase" autocomplete="new-password" />
-          <label for="wallet-passphrase-confirm">Confirm passphrase</label>
-          <input type="password" id="wallet-passphrase-confirm" autocomplete="new-password" />
-          <label for="wallet-lock-duration">Unlock for (minutes)</label>
-          <input type="number" min="1" max="1440" id="wallet-lock-duration" value="15" />
-          <div class="button-row">
-            <button type="submit">Save</button>
-            <button type="button" id="create-wallet" class="secondary">Create new</button>
-          </div>
-        </form>
       </div>
-      <p id="wallet-error" class="error hidden"></p>
-    </section>
+    </div>
+
+    <div id="confirm-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="confirm-title">Confirm Action</h2>
+          <button id="confirm-close" class="icon-button">✕</button>
+        </div>
+        <div class="modal-body">
+          <p id="confirm-message"></p>
+          <div id="confirm-typed-input" class="hidden">
+            <label>
+              Type <strong id="confirm-typed-value"></strong> to confirm:
+              <input type="text" id="confirm-input" />
+            </label>
+          </div>
+          <div class="button-row">
+            <button id="confirm-ok" class="danger">Confirm</button>
+            <button id="confirm-cancel" class="secondary">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <section class="card" id="balance-section">
       <div class="section-header">

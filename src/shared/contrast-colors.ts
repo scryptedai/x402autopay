@@ -92,3 +92,4 @@ export function computeLabelColor(text: string, background: string): string {
   return labelColor;
 }
 
+

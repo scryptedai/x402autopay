@@ -262,3 +262,162 @@ footer {
   color: var(--muted);
   font-size: 0.75rem;
 }
+
+.wallet-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+}
+
+.wallet-status-badge.locked {
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+}
+
+.wallet-status-badge.unlocked {
+  background: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+}
+
+.wallet-status-badge.unsecured {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+.status-icon {
+  font-size: 1rem;
+}
+
+.address-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.address-truncated {
+  font-family: monospace;
+  font-size: 0.9rem;
+  flex: 1;
+}
+
+.address-full {
+  font-family: monospace;
+  font-size: 0.8rem;
+  word-break: break-all;
+  padding: 8px;
+  background: rgba(148, 163, 184, 0.1);
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+.icon-button {
+  background: transparent;
+  border: none;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  opacity: 0.7;
+}
+
+.icon-button:hover {
+  opacity: 1;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-content {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 400px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.modal-body {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-section {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-section h3 {
+  margin: 0 0 8px 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.warning-banner {
+  padding: 10px;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 6px;
+  color: #92400e;
+  font-size: 0.85rem;
+}
+
+.private-key-container {
+  display: grid;
+  gap: 8px;
+}
+
+.private-key-container textarea.masked {
+  font-family: monospace;
+  letter-spacing: 0.2em;
+  font-size: 1.2rem;
+  text-align: center;
+}
+
+details summary {
+  cursor: pointer;
+  padding: 8px;
+  background: rgba(148, 163, 184, 0.1);
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+details[open] summary {
+  margin-bottom: 12px;
+}

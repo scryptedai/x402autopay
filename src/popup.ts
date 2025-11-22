@@ -20,32 +20,56 @@ const CHAIN_LABELS: Record<ChainId, string> = {
 };
 
 const elements = {
-  walletAddress: document.getElementById("wallet-address") as HTMLElement,
+  walletEmpty: document.getElementById("wallet-empty") as HTMLElement,
+  walletConfigured: document.getElementById("wallet-configured") as HTMLElement,
+  walletSettings: document.getElementById("wallet-settings") as HTMLButtonElement,
+  createWalletBtn: document.getElementById("create-wallet-btn") as HTMLButtonElement,
+  importWalletBtn: document.getElementById("import-wallet-btn") as HTMLButtonElement,
+  walletStatusBadge: document.getElementById("wallet-status-badge") as HTMLElement,
+  walletStatusText: document.getElementById("wallet-status-text") as HTMLElement,
+  walletAddressTruncated: document.getElementById("wallet-address-truncated") as HTMLElement,
+  walletAddressFull: document.getElementById("wallet-address-full") as HTMLElement,
+  addressExpand: document.getElementById("address-expand") as HTMLButtonElement,
   copyWallet: document.getElementById("copy-wallet") as HTMLButtonElement,
+  unlockSection: document.getElementById("unlock-section") as HTMLElement,
+  unlockForm: document.getElementById("unlock-form") as HTMLFormElement,
+  unlockPassphrase: document.getElementById("unlock-passphrase") as HTMLInputElement,
+  unlockDuration: document.getElementById("unlock-duration") as HTMLInputElement,
+  unlockedSection: document.getElementById("unlocked-section") as HTMLElement,
+  unlockTimer: document.getElementById("unlock-timer") as HTMLElement,
+  lockWallet: document.getElementById("lock-wallet") as HTMLButtonElement,
+  walletError: document.getElementById("wallet-error") as HTMLElement,
+  settingsModal: document.getElementById("settings-modal") as HTMLElement,
+  settingsClose: document.getElementById("settings-close") as HTMLButtonElement,
   backupWallet: document.getElementById("backup-wallet") as HTMLButtonElement,
-  walletSeedForm: document.getElementById("wallet-seed-form") as HTMLFormElement,
+  importDifferentWallet: document.getElementById("import-different-wallet") as HTMLButtonElement,
+  removeWallet: document.getElementById("remove-wallet") as HTMLButtonElement,
+  walletImportForm: document.getElementById("wallet-import-form") as HTMLFormElement,
   walletPrivateKey: document.getElementById("wallet-private-key") as HTMLTextAreaElement,
   walletPassphrase: document.getElementById("wallet-passphrase") as HTMLInputElement,
   walletPassphraseConfirm: document.getElementById("wallet-passphrase-confirm") as HTMLInputElement,
   walletLockDuration: document.getElementById("wallet-lock-duration") as HTMLInputElement,
-  createWallet: document.getElementById("create-wallet") as HTMLButtonElement,
-  regenWallet: document.getElementById("regen-wallet") as HTMLButtonElement,
-  clearWallet: document.getElementById("clear-wallet") as HTMLButtonElement,
-  walletConfigured: document.getElementById("wallet-configured") as HTMLElement,
-  walletStatus: document.getElementById("wallet-status") as HTMLElement,
-  walletError: document.getElementById("wallet-error") as HTMLElement,
-  unlockForm: document.getElementById("unlock-form") as HTMLFormElement,
-  unlockPassphrase: document.getElementById("unlock-passphrase") as HTMLInputElement,
-  unlockDuration: document.getElementById("unlock-duration") as HTMLInputElement,
-  lockWallet: document.getElementById("lock-wallet") as HTMLButtonElement,
+  importCancel: document.getElementById("import-cancel") as HTMLButtonElement,
+  backupModal: document.getElementById("backup-modal") as HTMLElement,
+  backupModalClose: document.getElementById("backup-modal-close") as HTMLButtonElement,
   backupForm: document.getElementById("backup-form") as HTMLFormElement,
   backupPassphrase: document.getElementById("backup-passphrase") as HTMLInputElement,
   backupResult: document.getElementById("backup-result") as HTMLElement,
   backupPrivateKey: document.getElementById("backup-private-key") as HTMLTextAreaElement,
+  revealKey: document.getElementById("reveal-key") as HTMLButtonElement,
   backupCopy: document.getElementById("backup-copy") as HTMLButtonElement,
-  backupCancel: document.getElementById("backup-cancel") as HTMLButtonElement,
   backupClose: document.getElementById("backup-close") as HTMLButtonElement,
+  backupCancel: document.getElementById("backup-cancel") as HTMLButtonElement,
   backupError: document.getElementById("backup-error") as HTMLElement,
+  confirmModal: document.getElementById("confirm-modal") as HTMLElement,
+  confirmClose: document.getElementById("confirm-close") as HTMLButtonElement,
+  confirmTitle: document.getElementById("confirm-title") as HTMLElement,
+  confirmMessage: document.getElementById("confirm-message") as HTMLElement,
+  confirmTypedInput: document.getElementById("confirm-typed-input") as HTMLElement,
+  confirmTypedValue: document.getElementById("confirm-typed-value") as HTMLElement,
+  confirmInput: document.getElementById("confirm-input") as HTMLInputElement,
+  confirmOk: document.getElementById("confirm-ok") as HTMLButtonElement,
+  confirmCancel: document.getElementById("confirm-cancel") as HTMLButtonElement,
   balanceTableBody: document.querySelector<HTMLTableSectionElement>("#balance-table tbody")!,
   refreshBalance: document.getElementById("refresh-balance") as HTMLButtonElement,
   thresholdInput: document.getElementById("threshold-input") as HTMLInputElement,
@@ -143,13 +167,29 @@ function clearWalletError() {
   elements.walletError.classList.add("hidden");
 }
 
+function truncateAddress(address: string): string {
+  if (address.length < 10) return address;
+  return `0x${address.slice(2, 6)}...${address.slice(-4)}`;
+}
+
 function resetBackupUI() {
-  elements.backupForm.classList.add("hidden");
+  elements.backupForm.classList.remove("hidden");
   elements.backupResult.classList.add("hidden");
   elements.backupError.classList.add("hidden");
   elements.backupError.textContent = "";
   elements.backupPassphrase.value = "";
   elements.backupPrivateKey.value = "";
+  actualPrivateKey = "";
+  if (elements.backupPrivateKey.classList.contains("masked") === false) {
+    elements.backupPrivateKey.classList.add("masked");
+  }
+  if (elements.revealKey) {
+    elements.revealKey.textContent = "Reveal";
+  }
+  if (keyRevealTimer) {
+    clearTimeout(keyRevealTimer);
+    keyRevealTimer = null;
+  }
 }
 
 function showBackupError(message: string) {
@@ -159,43 +199,47 @@ function showBackupError(message: string) {
 
 function renderWallet(wallet?: WalletData) {
   clearWalletError();
-  resetBackupUI();
   const now = Date.now();
   const lockDuration = wallet?.lockDurationMinutes ?? DEFAULT_LOCK_MINUTES;
   elements.walletLockDuration.value = lockDuration.toString();
   elements.unlockDuration.value = lockDuration.toString();
+  
   if (!wallet) {
-    elements.walletAddress.textContent = "(not configured)";
-    elements.copyWallet.disabled = true;
-    elements.backupWallet.disabled = true;
+    elements.walletEmpty.classList.remove("hidden");
     elements.walletConfigured.classList.add("hidden");
-    elements.walletSeedForm.classList.remove("hidden");
-    elements.walletStatus.textContent = "Wallet not configured";
-    elements.unlockForm.classList.add("hidden");
-    elements.lockWallet.classList.add("hidden");
     return;
   }
-  elements.walletAddress.textContent = wallet.address;
-  elements.copyWallet.disabled = false;
-  elements.backupWallet.disabled = !wallet.encryptedPrivateKey;
+
+  elements.walletEmpty.classList.add("hidden");
   elements.walletConfigured.classList.remove("hidden");
+
+  const truncated = truncateAddress(wallet.address);
+  elements.walletAddressTruncated.textContent = truncated;
+  elements.walletAddressFull.textContent = wallet.address;
+
   const unlocked = typeof wallet.lockedUntil === "number" && wallet.lockedUntil > now;
   const secured = Boolean(wallet.encryptedPrivateKey);
+
   if (!secured) {
-    elements.walletStatus.textContent = "Unsecured wallet - re-import with passphrase.";
-    elements.unlockForm.classList.add("hidden");
-    elements.lockWallet.classList.add("hidden");
-    elements.walletSeedForm.classList.remove("hidden");
+    elements.walletStatusBadge.className = "wallet-status-badge unsecured";
+    elements.walletStatusBadge.innerHTML = '<span class="status-icon">⚠️</span><span id="wallet-status-text">Unsecured</span>';
+    elements.walletStatusText = document.getElementById("wallet-status-text") as HTMLElement;
+    elements.unlockSection.classList.add("hidden");
+    elements.unlockedSection.classList.add("hidden");
   } else if (unlocked) {
-    elements.walletStatus.textContent = `Unlocked until ${new Date(wallet.lockedUntil).toLocaleTimeString()}`;
-    elements.unlockForm.classList.add("hidden");
-    elements.lockWallet.classList.remove("hidden");
-    elements.walletSeedForm.classList.add("hidden");
+    elements.walletStatusBadge.className = "wallet-status-badge unlocked";
+    elements.walletStatusBadge.innerHTML = '<span class="status-icon">🔓</span><span id="wallet-status-text">Unlocked</span>';
+    elements.walletStatusText = document.getElementById("wallet-status-text") as HTMLElement;
+    const remaining = Math.floor((wallet.lockedUntil - now) / 60000);
+    elements.unlockTimer.textContent = `Unlocked for ${remaining} more minutes`;
+    elements.unlockSection.classList.add("hidden");
+    elements.unlockedSection.classList.remove("hidden");
   } else {
-    elements.walletStatus.textContent = "Locked";
-    elements.unlockForm.classList.remove("hidden");
-    elements.lockWallet.classList.add("hidden");
-    elements.walletSeedForm.classList.add("hidden");
+    elements.walletStatusBadge.className = "wallet-status-badge locked";
+    elements.walletStatusBadge.innerHTML = '<span class="status-icon">🔒</span><span id="wallet-status-text">Locked</span>';
+    elements.walletStatusText = document.getElementById("wallet-status-text") as HTMLElement;
+    elements.unlockSection.classList.remove("hidden");
+    elements.unlockedSection.classList.add("hidden");
   }
   elements.unlockPassphrase.value = "";
 }
@@ -296,21 +340,36 @@ function renderStatus(status: ExtensionState["extensionStatus"]) {
   elements.statusLabel.textContent = label;
 }
 
+let keyRevealTimer: number | null = null;
+let actualPrivateKey: string = "";
+
 elements.copyWallet.addEventListener("click", () => {
   if (!state.wallet) return;
   navigator.clipboard.writeText(state.wallet.address).catch(() => undefined);
 });
 
+elements.addressExpand.addEventListener("click", () => {
+  elements.walletAddressFull.classList.toggle("hidden");
+});
+
+elements.walletSettings.addEventListener("click", () => {
+  elements.settingsModal.classList.remove("hidden");
+});
+
+elements.settingsClose.addEventListener("click", () => {
+  elements.settingsModal.classList.add("hidden");
+});
+
 elements.backupWallet.addEventListener("click", () => {
   if (!state.wallet || !state.wallet.encryptedPrivateKey) return;
-  if (elements.backupResult.classList.contains("hidden") === false) {
-    resetBackupUI();
-    return;
-  }
-  elements.backupForm.classList.remove("hidden");
-  elements.backupError.classList.add("hidden");
-  elements.backupPassphrase.value = "";
+  resetBackupUI();
+  elements.backupModal.classList.remove("hidden");
   setTimeout(() => elements.backupPassphrase.focus(), 0);
+});
+
+elements.backupModalClose.addEventListener("click", () => {
+  elements.backupModal.classList.add("hidden");
+  resetBackupUI();
 });
 
 elements.backupForm.addEventListener("submit", async (event) => {
@@ -337,24 +396,76 @@ elements.backupForm.addEventListener("submit", async (event) => {
   }
   elements.backupForm.classList.add("hidden");
   elements.backupPassphrase.value = "";
-  elements.backupPrivateKey.value = response.privateKey;
+  actualPrivateKey = response.privateKey;
+  elements.backupPrivateKey.value = "•".repeat(66);
+  elements.backupPrivateKey.classList.add("masked");
   elements.backupResult.classList.remove("hidden");
+  if (keyRevealTimer) {
+    clearTimeout(keyRevealTimer);
+  }
+  keyRevealTimer = window.setTimeout(() => {
+    elements.backupPrivateKey.value = "•".repeat(66);
+    elements.backupPrivateKey.classList.add("masked");
+    if (elements.revealKey) elements.revealKey.textContent = "Reveal";
+  }, 30000);
+});
+
+elements.revealKey.addEventListener("click", () => {
+  if (elements.backupPrivateKey.classList.contains("masked")) {
+    elements.backupPrivateKey.value = actualPrivateKey;
+    elements.backupPrivateKey.classList.remove("masked");
+    elements.revealKey.textContent = "Hide";
+    if (keyRevealTimer) {
+      clearTimeout(keyRevealTimer);
+    }
+    keyRevealTimer = window.setTimeout(() => {
+      elements.backupPrivateKey.value = "•".repeat(66);
+      elements.backupPrivateKey.classList.add("masked");
+      elements.revealKey.textContent = "Reveal";
+    }, 30000);
+  } else {
+    elements.backupPrivateKey.value = "•".repeat(66);
+    elements.backupPrivateKey.classList.add("masked");
+    elements.revealKey.textContent = "Reveal";
+    if (keyRevealTimer) {
+      clearTimeout(keyRevealTimer);
+      keyRevealTimer = null;
+    }
+  }
 });
 
 elements.backupCancel.addEventListener("click", () => {
+  elements.backupModal.classList.add("hidden");
   resetBackupUI();
 });
 
 elements.backupClose.addEventListener("click", () => {
+  elements.backupModal.classList.add("hidden");
   resetBackupUI();
 });
 
 elements.backupCopy.addEventListener("click", () => {
-  if (!elements.backupPrivateKey.value) return;
-  navigator.clipboard.writeText(elements.backupPrivateKey.value).catch(() => undefined);
+  if (!actualPrivateKey) return;
+  navigator.clipboard.writeText(actualPrivateKey).catch(() => undefined);
 });
 
-elements.walletSeedForm.addEventListener("submit", async (event) => {
+elements.createWalletBtn.addEventListener("click", () => {
+  const wallet = ethers.Wallet.createRandom();
+  elements.walletPrivateKey.value = wallet.privateKey;
+  elements.walletPassphrase.value = "";
+  elements.walletPassphraseConfirm.value = "";
+  elements.settingsModal.classList.remove("hidden");
+  const details = elements.settingsModal.querySelector("details");
+  if (details) details.setAttribute("open", "");
+});
+
+elements.importWalletBtn.addEventListener("click", () => {
+  elements.settingsModal.classList.remove("hidden");
+  const details = elements.settingsModal.querySelector("details");
+  if (details) details.setAttribute("open", "");
+});
+
+elements.walletImportForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   clearWalletError();
   const key = elements.walletPrivateKey.value.trim();
@@ -388,42 +499,82 @@ elements.walletSeedForm.addEventListener("submit", async (event) => {
   elements.walletPrivateKey.value = "";
   elements.walletPassphrase.value = "";
   elements.walletPassphraseConfirm.value = "";
+  elements.settingsModal.classList.add("hidden");
   await loadState();
 });
 
-elements.createWallet.addEventListener("click", () => {
-  clearWalletError();
-  const wallet = ethers.Wallet.createRandom();
-  elements.walletPrivateKey.value = wallet.privateKey;
-  elements.walletPassphrase.value = "";
-  elements.walletPassphraseConfirm.value = "";
-});
-
-elements.regenWallet.addEventListener("click", () => {
-  clearWalletError();
-  const wallet = ethers.Wallet.createRandom();
-  elements.walletSeedForm.classList.remove("hidden");
-  elements.walletPrivateKey.value = wallet.privateKey;
-  elements.walletPassphrase.value = "";
-  elements.walletPassphraseConfirm.value = "";
-  elements.walletLockDuration.value = (state.wallet?.lockDurationMinutes ?? DEFAULT_LOCK_MINUTES).toString();
-  elements.walletSeedForm.scrollIntoView({ behavior: "smooth", block: "center" });
-});
-
-elements.clearWallet.addEventListener("click", async () => {
-  clearWalletError();
-  if (!state.wallet) return;
-  const first = window.confirm("Remove this wallet from X402 Autopay?");
-  if (!first) return;
-  const second = window.confirm("This will permanently delete the stored private key and passphrase. Continue?");
-  if (!second) return;
-  await chrome.runtime.sendMessage({ type: "x402:updateWallet", wallet: null });
+elements.importCancel.addEventListener("click", () => {
   elements.walletPrivateKey.value = "";
   elements.walletPassphrase.value = "";
   elements.walletPassphraseConfirm.value = "";
-  resetBackupUI();
-  await loadState();
+  const details = elements.settingsModal.querySelector("details");
+  if (details) details.removeAttribute("open");
 });
+
+elements.importDifferentWallet.addEventListener("click", () => {
+  showConfirmModal(
+    "Remove current wallet?",
+    "You must remove the current wallet before importing a different one. This action cannot be undone.",
+    "REMOVE",
+    async () => {
+      await chrome.runtime.sendMessage({ type: "x402:updateWallet", wallet: null });
+      elements.settingsModal.classList.add("hidden");
+      await loadState();
+    }
+  );
+});
+
+elements.removeWallet.addEventListener("click", () => {
+  if (!state.wallet) return;
+  const addressToConfirm = truncateAddress(state.wallet.address);
+  showConfirmModal(
+    "Remove wallet?",
+    `This will permanently delete the wallet. Type "${addressToConfirm}" to confirm:`,
+    addressToConfirm,
+    async () => {
+      await chrome.runtime.sendMessage({ type: "x402:updateWallet", wallet: null });
+      elements.settingsModal.classList.add("hidden");
+      await loadState();
+    }
+  );
+});
+
+function showConfirmModal(title: string, message: string, typedValue: string | null, onConfirm: () => void) {
+  elements.confirmTitle.textContent = title;
+  elements.confirmMessage.textContent = message;
+  
+  if (typedValue) {
+    elements.confirmTypedInput.classList.remove("hidden");
+    elements.confirmTypedValue.textContent = typedValue;
+    elements.confirmInput.value = "";
+  } else {
+    elements.confirmTypedInput.classList.add("hidden");
+  }
+
+  const handleConfirm = () => {
+    if (typedValue && elements.confirmInput.value !== typedValue) {
+      return;
+    }
+    elements.confirmModal.classList.add("hidden");
+    onConfirm();
+    elements.confirmOk.removeEventListener("click", handleConfirm);
+    elements.confirmCancel.removeEventListener("click", handleCancel);
+  };
+
+  const handleCancel = () => {
+    elements.confirmModal.classList.add("hidden");
+    elements.confirmOk.removeEventListener("click", handleConfirm);
+    elements.confirmCancel.removeEventListener("click", handleCancel);
+  };
+
+  elements.confirmOk.addEventListener("click", handleConfirm);
+  elements.confirmCancel.addEventListener("click", handleCancel);
+  elements.confirmClose.addEventListener("click", handleCancel);
+  elements.confirmModal.classList.remove("hidden");
+  if (typedValue) {
+    setTimeout(() => elements.confirmInput.focus(), 0);
+  }
+}
 
 elements.unlockForm.addEventListener("submit", async (event) => {
   event.preventDefault();
