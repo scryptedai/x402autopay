@@ -9,6 +9,7 @@ import type {
   SitePolicy,
   WalletData,
   SiteBranding,
+  EnsData,
 } from "./types";
 
 let runtimePrivateKey: string | undefined;
@@ -270,5 +271,21 @@ export async function saveBranding(origin: string, branding: SiteBranding): Prom
 
 export async function removeBranding(origin: string): Promise<void> {
   const key = `branding:${origin}`;
+  await chrome.storage.local.remove(key);
+}
+
+export async function getEnsData(address: string): Promise<EnsData | undefined> {
+  const key = `ens:${address.toLowerCase()}`;
+  const stored = await chrome.storage.local.get(key);
+  return stored[key] as EnsData | undefined;
+}
+
+export async function saveEnsData(address: string, data: EnsData): Promise<void> {
+  const key = `ens:${address.toLowerCase()}`;
+  await chrome.storage.local.set({ [key]: data });
+}
+
+export async function removeEnsData(address: string): Promise<void> {
+  const key = `ens:${address.toLowerCase()}`;
   await chrome.storage.local.remove(key);
 }

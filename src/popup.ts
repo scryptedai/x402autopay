@@ -88,6 +88,8 @@ const elements = {
   websiteBranding: document.getElementById("website-branding") as HTMLElement,
   websiteIcon: document.getElementById("website-icon") as HTMLImageElement,
   websiteDomain: document.getElementById("website-domain") as HTMLElement,
+  walletEnsAvatar: document.getElementById("wallet-ens-avatar") as HTMLImageElement,
+  walletEnsName: document.getElementById("wallet-ens-name") as HTMLElement,
 } as const;
 
 async function loadState() {
@@ -145,6 +147,43 @@ function displayWebsiteBranding(origin: string, branding: { logo?: string; logoD
     }
   } catch {
     elements.websiteBranding.classList.add("hidden");
+  }
+}
+
+function displayEnsData(ens: { name: string; avatar?: string; avatarDataUri?: string } | null) {
+  if (!ens) {
+    elements.walletEnsName.classList.add("hidden");
+    elements.walletEnsAvatar.classList.add("hidden");
+    return;
+  }
+  
+  elements.walletEnsName.textContent = ens.name;
+  elements.walletEnsName.classList.remove("hidden");
+  
+  if (ens.avatarDataUri || ens.avatar) {
+    elements.walletEnsAvatar.src = ens.avatarDataUri || ens.avatar || "";
+    elements.walletEnsAvatar.classList.remove("hidden");
+    elements.walletEnsAvatar.onerror = () => {
+      elements.walletEnsAvatar.classList.add("hidden");
+    };
+  } else {
+    elements.walletEnsAvatar.classList.add("hidden");
+  }
+}
+
+async function resolveWalletEns(address: string) {
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "x402:resolveEns",
+      address,
+    });
+    if (response?.ens) {
+      displayEnsData(response.ens);
+    } else {
+      displayEnsData(null);
+    }
+  } catch {
+    displayEnsData(null);
   }
 }
 
@@ -216,6 +255,8 @@ function renderWallet(wallet?: WalletData) {
   const truncated = truncateAddress(wallet.address);
   elements.walletAddressTruncated.textContent = truncated;
   elements.walletAddressFull.textContent = wallet.address;
+
+  resolveWalletEns(wallet.address);
 
   const unlocked = typeof wallet.lockedUntil === "number" && wallet.lockedUntil > now;
   const secured = Boolean(wallet.encryptedPrivateKey);
@@ -468,12 +509,12 @@ elements.importWalletBtn.addEventListener("click", () => {
 elements.walletImportForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   clearWalletError();
-  const key = elements.walletPrivateKey.value.trim();
+  const input = elements.walletPrivateKey.value.trim();
   const passphrase = elements.walletPassphrase.value;
   const confirm = elements.walletPassphraseConfirm.value;
   const lockDuration = Number(elements.walletLockDuration.value) || DEFAULT_LOCK_MINUTES;
-  if (!key) {
-    showWalletError("Private key required.");
+  if (!input) {
+    showWalletError("Private key or mnemonic phrase required.");
     return;
   }
   if (!passphrase || passphrase.length < 8) {
@@ -487,7 +528,7 @@ elements.walletImportForm.addEventListener("submit", async (event) => {
   const response = await chrome.runtime.sendMessage({
     type: "x402:updateWallet",
     wallet: {
-      privateKey: key,
+      privateKeyOrMnemonic: input,
       passphrase,
       lockDurationMinutes: lockDuration,
     },

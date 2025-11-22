@@ -155,3 +155,10 @@ export interface SiteBranding {
   detectedAt?: number; // Timestamp of detection
   source?: "implicit" | "explicit" | "cached";
 }
+
+export interface EnsData {
+  name: string;
+  avatar?: string;
+  avatarDataUri?: string;
+  resolvedAt: number;
+}

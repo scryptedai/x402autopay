@@ -42,12 +42,18 @@
             <span class="status-icon">🔒</span>
             <span id="wallet-status-text">Locked</span>
           </div>
-          <div class="address-display">
-            <code id="wallet-address-truncated" class="address-truncated">0x0000...0000</code>
-            <button id="address-expand" class="icon-button" title="Show full address">⋯</button>
-            <button id="copy-wallet" class="icon-button" title="Copy address">📋</button>
+          <div class="wallet-identity">
+            <img id="wallet-ens-avatar" class="wallet-ens-avatar hidden" alt="ENS avatar" />
+            <div class="wallet-address-container">
+              <div id="wallet-ens-name" class="wallet-ens-name hidden"></div>
+              <div class="address-display">
+                <code id="wallet-address-truncated" class="address-truncated">0x0000...0000</code>
+                <button id="address-expand" class="icon-button" title="Show full address">⋯</button>
+                <button id="copy-wallet" class="icon-button" title="Copy address">📋</button>
+              </div>
+              <div id="wallet-address-full" class="address-full hidden"></div>
+            </div>
           </div>
-          <div id="wallet-address-full" class="address-full hidden"></div>
         </div>
 
         <div id="unlock-section" class="stack hidden">
@@ -91,11 +97,12 @@
           <div class="settings-section">
             <h3>Advanced</h3>
             <details>
-              <summary>Import private key</summary>
+              <summary>Import wallet</summary>
               <form id="wallet-import-form" class="stack">
                 <label>
-                  Private key
-                  <textarea id="wallet-private-key" rows="2" placeholder="0x…" spellcheck="false"></textarea>
+                  Private key or mnemonic phrase
+                  <textarea id="wallet-private-key" rows="3" placeholder="0x… or word1 word2 word3 …" spellcheck="false"></textarea>
+                  <small style="color: var(--muted); font-size: 0.75rem;">Enter a private key (0x…) or 12/24 word mnemonic phrase</small>
                 </label>
                 <label>
                   Passphrase

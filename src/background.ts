@@ -16,6 +16,8 @@ import {
   upsertPolicy,
   getBranding,
   saveBranding,
+  getEnsData,
+  saveEnsData,
 } from "./shared/storage";
 import type {
   BalanceCache,
@@ -41,6 +43,7 @@ import {
   fetchManifestBranding,
   isBrandingCacheValid,
 } from "./shared/branding";
+import { resolveEns, isEnsCacheValid } from "./shared/ens";
 import type { SiteBranding } from "./shared/types";
 
 const BALANCE_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
@@ -87,6 +90,7 @@ const DEFAULT_LOCK_MINUTES = 15;
 
 type WalletUpdatePayload = {
   privateKey?: string;
+  privateKeyOrMnemonic?: string;
   passphrase?: string;
   lockDurationMinutes?: number;
   label?: string;
@@ -949,6 +953,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "x402:resolveEns" && typeof message.address === "string") {
+    (async () => {
+      const address = message.address;
+      try {
+        const cached = await getEnsData(address);
+        if (cached && isEnsCacheValid(cached)) {
+          sendResponse({ ens: cached, cached: true });
+          return;
+        }
+        
+        const ensData = await resolveEns(address);
+        if (ensData) {
+          await saveEnsData(address, ensData);
+          sendResponse({ ens: ensData, cached: false });
+        } else {
+          sendResponse({ ens: null, cached: false });
+        }
+      } catch (error: unknown) {
+        console.error("x402-autopay: Error resolving ENS:", error);
+        sendResponse({ error: String(error) });
+      }
+    })();
+    return true;
+  }
+
   if (message.type === "x402:jwtFor" && typeof message.paymentId === "string") {
     getJwt(message.paymentId)
       .then((jwt) => sendResponse({ jwt }))
@@ -971,8 +1000,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ wallet: updated.wallet });
         return;
       }
-      if (typeof payload.privateKey !== "string" || !payload.privateKey.trim()) {
-        sendResponse({ error: "Private key required" });
+      const input = payload.privateKeyOrMnemonic || payload.privateKey;
+      if (typeof input !== "string" || !input.trim()) {
+        sendResponse({ error: "Private key or mnemonic phrase required" });
         return;
       }
       if (typeof payload.passphrase !== "string" || payload.passphrase.length < 8) {
@@ -980,10 +1010,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return;
       }
       try {
-        const trimmedKey = payload.privateKey.trim();
-        const signer = new ethers.Wallet(trimmedKey);
+        const trimmedInput = input.trim();
+        let privateKey: string;
+        
+        const wordCount = trimmedInput.split(/\s+/).filter(w => w.length > 0).length;
+        const isMnemonic = (wordCount === 12 || wordCount === 24) && !trimmedInput.startsWith("0x");
+        
+        if (isMnemonic) {
+          try {
+            const wallet = ethers.Wallet.fromPhrase(trimmedInput);
+            privateKey = wallet.privateKey;
+          } catch (mnemonicError) {
+            sendResponse({ error: "Invalid mnemonic phrase" });
+            return;
+          }
+        } else {
+          const normalizedKey = trimmedInput.startsWith("0x") ? trimmedInput : `0x${trimmedInput}`;
+          try {
+            const testWallet = new ethers.Wallet(normalizedKey);
+            privateKey = testWallet.privateKey;
+          } catch (keyError) {
+            sendResponse({ error: "Invalid private key or mnemonic phrase" });
+            return;
+          }
+        }
+        
+        const signer = new ethers.Wallet(privateKey);
         const lockDuration = normalizeLockDuration(payload.lockDurationMinutes);
-        const encrypted = await encryptSecret(trimmedKey, payload.passphrase);
+        const encrypted = await encryptSecret(privateKey, payload.passphrase);
         const lockedUntil = computeUnlockExpiry(lockDuration);
         const stored: WalletData = {
           address: signer.address,
@@ -993,7 +1047,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           lockDurationMinutes: lockDuration,
           lockedUntil,
           label: payload.label,
-          privateKey: trimmedKey,
+          privateKey,
         };
         const updated = await updateWallet(stored);
         if (updated.wallet) {
