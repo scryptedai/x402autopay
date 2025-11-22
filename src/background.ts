@@ -14,6 +14,8 @@ import {
   updateSettings,
   updateWallet,
   upsertPolicy,
+  getBranding,
+  saveBranding,
 } from "./shared/storage";
 import type {
   BalanceCache,
@@ -34,6 +36,12 @@ import type {
 import { parseChallengeHeaders } from "./shared/x402";
 import { getTokenPriceUsd } from "./shared/api";
 import { encryptSecret, decryptSecret } from "./shared/crypto";
+import {
+  fetchImageAsDataUri,
+  fetchManifestBranding,
+  isBrandingCacheValid,
+} from "./shared/branding";
+import type { SiteBranding } from "./shared/types";
 
 const BALANCE_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 const BALANCE_REFRESH_ALARM = "x402-balance-refresh";
@@ -410,6 +418,147 @@ function shouldAutoApprove(state: Awaited<ReturnType<typeof getState>>, challeng
   return true;
 }
 
+async function detectManifestBranding(tabId: number, origin: string): Promise<SiteBranding | undefined> {
+  try {
+    const manifestResults = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const manifestLink = document.querySelector('link[rel="manifest"]');
+        if (!manifestLink) return null;
+        const href = manifestLink.getAttribute("href");
+        if (!href) return null;
+        try {
+          return new URL(href, window.location.origin).toString();
+        } catch {
+          return null;
+        }
+      },
+    });
+    
+    if (manifestResults && manifestResults[0]?.result) {
+      const manifestUrl = manifestResults[0].result as string;
+      if (manifestUrl) {
+        return await fetchManifestBranding(manifestUrl, origin);
+      }
+    }
+  } catch (error) {
+    console.warn("Failed to detect manifest branding", error);
+  }
+  return undefined;
+}
+
+async function fetchAndCacheLogo(branding: SiteBranding, origin: string): Promise<void> {
+  if (branding.logo && !branding.logoDataUri) {
+    try {
+      const dataUri = await fetchImageAsDataUri(branding.logo, origin);
+      if (dataUri) branding.logoDataUri = dataUri;
+    } catch (error) {
+      console.warn("Failed to fetch branding logo", error);
+    }
+  }
+  if (branding.source === "explicit" || branding.source === "implicit") {
+    await saveBranding(origin, branding);
+  }
+}
+
+async function detectHtmlBranding(tabId: number): Promise<SiteBranding | undefined> {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const branding: { logo?: string; themeColor?: string } = {};
+        
+        const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+        if (themeColorMeta) {
+          const color = themeColorMeta.getAttribute("content");
+          if (color && /^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/.test(color)) {
+            branding.themeColor = color;
+          }
+        }
+        
+        const logoSelectors = [
+          'link[rel="apple-touch-icon"]',
+          'link[rel="icon"][sizes="192x192"]',
+          'link[rel="icon"][sizes="512x512"]',
+          'link[rel="icon"]',
+          'link[rel="logo"]',
+          'meta[property="og:image"]',
+        ];
+        
+        for (const selector of logoSelectors) {
+          const element = document.querySelector(selector);
+          if (!element) continue;
+          
+          let logoUrl: string | null = null;
+          if (element.tagName === "LINK") {
+            logoUrl = element.getAttribute("href");
+          } else if (element.tagName === "META") {
+            logoUrl = element.getAttribute("content");
+          }
+          
+          if (logoUrl) {
+            try {
+              const resolvedUrl = new URL(logoUrl, window.location.origin).toString();
+              branding.logo = resolvedUrl;
+              break;
+            } catch {
+              // continue
+            }
+          }
+        }
+        
+        return branding;
+      },
+    });
+    
+    if (results && results[0]?.result) {
+      const detected = results[0].result;
+      return {
+        source: "implicit",
+        detectedAt: Date.now(),
+        logo: detected.logo,
+        colorScheme: detected.themeColor ? { primary: detected.themeColor } : undefined,
+      };
+    }
+  } catch (error) {
+    console.warn("Failed to detect branding from page", error);
+  }
+  return undefined;
+}
+
+async function processBranding(challenge: ChallengeDetails, tabId?: number): Promise<SiteBranding | undefined> {
+  const origin = challenge.origin;
+  const explicit = challenge.branding;
+  const cached = await getBranding(origin);
+  
+  if (explicit) {
+    await fetchAndCacheLogo(explicit, origin);
+    return explicit;
+  }
+  
+  if (cached && isBrandingCacheValid(cached)) {
+    return cached;
+  }
+  
+  if (!tabId) {
+    return undefined;
+  }
+  
+  const manifest = await detectManifestBranding(tabId, origin);
+  if (manifest) {
+    await fetchAndCacheLogo(manifest, origin);
+    return manifest;
+  }
+  
+  const implicit = await detectHtmlBranding(tabId);
+  if (implicit) {
+    await fetchAndCacheLogo(implicit, origin);
+    return implicit;
+  }
+  
+  return undefined;
+}
+
 async function handleChallenge(
   challenge: ChallengeDetails,
   sender: chrome.runtime.MessageSender,
@@ -426,6 +575,12 @@ async function handleChallenge(
   if (mappedChain) {
     refreshBalance(true, mappedChain).catch(() => undefined);
   }
+  
+  const branding = await processBranding(challenge, sender.tab?.id);
+  if (branding) {
+    challenge.branding = branding;
+  }
+  
   await ensureChallengeStored(challenge, sender.tab?.id);
 
   if (shouldAutoApprove(state, challenge)) {
@@ -755,6 +910,42 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     refreshAllBalances(true)
       .then((balances) => sendResponse({ balances }))
       .catch((error: unknown) => sendResponse({ error: String(error) }));
+    return true;
+  }
+
+  if (message.type === "x402:detectBranding" && typeof message.origin === "string") {
+    (async () => {
+      const origin = message.origin;
+      const tabId = typeof message.tabId === "number" ? message.tabId : undefined;
+      
+      try {
+        const cached = await getBranding(origin);
+        if (cached && isBrandingCacheValid(cached)) {
+          sendResponse({ branding: cached, cached: true });
+          return;
+        }
+        
+        const dummyChallenge: ChallengeDetails = {
+          amountUsd: 0,
+          tokenSymbol: "USDC",
+          challengeId: crypto.randomUUID(),
+          endpoint: "/",
+          origin,
+          rawHeaders: {},
+          method: "GET",
+          chainId: 137,
+          tokenAddress: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+          seller: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+          amountAtomic: "0",
+        };
+        
+        const branding = await processBranding(dummyChallenge, tabId);
+        sendResponse({ branding: branding ?? null, cached: false });
+      } catch (error: unknown) {
+        console.error("x402-autopay: Error detecting branding:", error);
+        sendResponse({ error: String(error) });
+      }
+    })();
     return true;
   }
 

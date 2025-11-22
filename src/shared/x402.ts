@@ -1,4 +1,5 @@
 import type { ChallengeDetails } from "./types";
+import { parseBrandingHeaders } from "./branding";
 
 const HEADER_CHALLENGE_JSON = "x-payment-challenge";
 const HEADER_ID = "x-402-id";
@@ -104,16 +105,26 @@ export function parseChallengeHeaders(
   requestInfo: { origin: string; endpoint: string; method: string },
 ): ChallengeDetails | undefined {
   const { rawHeaders, challengeId } = baseDetails(headers, requestInfo);
+  
+  // Extract branding from headers (if present)
+  const branding = parseBrandingHeaders(rawHeaders, requestInfo.origin);
+  
   const jsonHeader = headers.get(HEADER_CHALLENGE_JSON) ?? rawHeaders[HEADER_CHALLENGE_JSON];
   if (jsonHeader) {
     const parsed = parseChallengeValue(jsonHeader, requestInfo, rawHeaders, challengeId);
-    if (parsed) return parsed;
+    if (parsed) {
+      if (branding) parsed.branding = branding;
+      return parsed;
+    }
   }
 
   const authHeader = headers.get("www-authenticate") ?? rawHeaders["www-authenticate"];
   if (authHeader) {
     const parsed = fromAuthenticateChallenge(authHeader, requestInfo, rawHeaders, challengeId);
-    if (parsed) return parsed;
+    if (parsed) {
+      if (branding) parsed.branding = branding;
+      return parsed;
+    }
   }
 
   // Fallback legacy headers
@@ -126,7 +137,7 @@ export function parseChallengeHeaders(
   if (!seller || !tokenAddress || !atomic) {
     return undefined;
   }
-  return {
+  const challenge: ChallengeDetails = {
     amountUsd,
     tokenSymbol,
     challengeId,
@@ -138,7 +149,9 @@ export function parseChallengeHeaders(
     tokenAddress: tokenAddress as `0x${string}`,
     seller: seller as `0x${string}`,
     amountAtomic: String(atomic),
-  } satisfies ChallengeDetails;
+  };
+  if (branding) challenge.branding = branding;
+  return challenge;
 }
 
 export function isX402ResponseStatus(status: number) {

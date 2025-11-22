@@ -1,5 +1,6 @@
 import { INITIAL_STATE } from "./shared/storage";
-import type { ChainId, ExtensionState, PendingChallenge } from "./shared/types";
+import type { ChainId, ExtensionState, PendingChallenge, SiteBranding } from "./shared/types";
+import { ensureReadableColors } from "./shared/contrast";
 
 const state: ExtensionState = structuredClone(INITIAL_STATE);
 
@@ -17,6 +18,7 @@ const elements = {
   approve: document.getElementById("prompt-approve") as HTMLButtonElement,
   deny: document.getElementById("prompt-deny") as HTMLButtonElement,
   status: document.getElementById("prompt-status") as HTMLElement,
+  logo: document.getElementById("prompt-logo") as HTMLImageElement,
 } as const;
 
 async function loadChallenge() {
@@ -55,6 +57,8 @@ async function loadChallenge() {
   elements.token.textContent = challenge.tokenSymbol;
   elements.balance.textContent = `${formattedBalance} ${(chainBalance?.tokenSymbol ?? challenge.tokenSymbol)}`;
   elements.policyToggle.checked = policy?.allowUnderThreshold ?? false;
+
+  applyBranding(challenge.branding);
 
   const insufficient = balanceAtomic < requiredAtomic;
   const locked = isWalletLocked(state.wallet);
@@ -157,6 +161,66 @@ function isWalletLocked(wallet: ExtensionState["wallet"]): boolean {
   if (!wallet) return true;
   const until = wallet.lockedUntil ?? 0;
   return until <= Date.now();
+}
+
+function applyBranding(branding: SiteBranding | undefined) {
+  if (!branding) return;
+
+  const root = document.documentElement;
+
+  if (branding.logoDataUri || branding.logo) {
+    elements.logo.src = branding.logoDataUri || branding.logo || "";
+    elements.logo.classList.remove("hidden");
+  } else {
+    elements.logo.classList.add("hidden");
+  }
+
+  const colorScheme = {
+    primary: branding.colorScheme?.primary,
+    background: branding.colorScheme?.background,
+    text: branding.colorScheme?.text,
+    accent: branding.colorScheme?.accent,
+    border: branding.colorScheme?.border,
+  };
+
+  if (branding.theme === "dark") {
+    root.style.setProperty("--body-background", "#1f2937");
+    if (!colorScheme.background) {
+      colorScheme.background = "#111827";
+    }
+    if (!colorScheme.text) {
+      colorScheme.text = "#f9fafb";
+    }
+  } else if (branding.theme === "light") {
+    root.style.setProperty("--body-background", "#f9fafb");
+    if (!colorScheme.background) {
+      colorScheme.background = "#ffffff";
+    }
+    if (!colorScheme.text) {
+      colorScheme.text = "#111827";
+    }
+  } else {
+    root.style.setProperty("--body-background", "#f9fafb");
+    if (!colorScheme.background) {
+      colorScheme.background = "#ffffff";
+    }
+    if (!colorScheme.text) {
+      colorScheme.text = "#111827";
+    }
+  }
+
+  const readableColors = ensureReadableColors(colorScheme);
+
+  root.style.setProperty("--brand-primary", readableColors.primary);
+  root.style.setProperty("--brand-background", readableColors.background);
+  root.style.setProperty("--brand-text", readableColors.text);
+  root.style.setProperty("--brand-accent", readableColors.accent);
+  root.style.setProperty("--brand-border", readableColors.border);
+  root.style.setProperty("--input-background", readableColors.inputBackground);
+  root.style.setProperty("--input-text", readableColors.inputText);
+  root.style.setProperty("--input-placeholder", readableColors.inputPlaceholder);
+  root.style.setProperty("--input-border", readableColors.inputBorder);
+  root.style.setProperty("--label-color", readableColors.labelColor);
 }
 
 loadChallenge().catch((error) => {

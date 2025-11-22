@@ -101,6 +101,7 @@ export interface ChallengeDetails {
   tokenVersion?: string;
   tokenDecimals?: number;
   rawChallenge?: unknown;
+  branding?: SiteBranding;
 }
 
 export type ChallengeResolutionAction = "retry" | "deny" | "error" | "pending";
@@ -136,4 +137,21 @@ export interface WalletFormState {
   passphrase?: string;
   confirmPassphrase?: string;
   lockDurationMinutes: number;
+}
+
+export interface ColorScheme {
+  primary?: string; // Main brand color (buttons, accents)
+  background?: string; // Background color
+  text?: string; // Text color
+  accent?: string; // Secondary accent color
+  border?: string; // Border color
+}
+
+export interface SiteBranding {
+  logo?: string; // URL or data URI
+  logoDataUri?: string; // Cached as data URI for offline use
+  colorScheme?: ColorScheme;
+  theme?: "light" | "dark" | "auto";
+  detectedAt?: number; // Timestamp of detection
+  source?: "implicit" | "explicit" | "cached";
 }

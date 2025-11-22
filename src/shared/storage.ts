@@ -8,6 +8,7 @@ import type {
   PendingChallenge,
   SitePolicy,
   WalletData,
+  SiteBranding,
 } from "./types";
 
 let runtimePrivateKey: string | undefined;
@@ -254,4 +255,20 @@ export async function getJwt(paymentId: string) {
     return undefined;
   }
   return entry;
+}
+
+export async function getBranding(origin: string): Promise<SiteBranding | undefined> {
+  const key = `branding:${origin}`;
+  const stored = await chrome.storage.local.get(key);
+  return stored[key] as SiteBranding | undefined;
+}
+
+export async function saveBranding(origin: string, branding: SiteBranding): Promise<void> {
+  const key = `branding:${origin}`;
+  await chrome.storage.local.set({ [key]: branding });
+}
+
+export async function removeBranding(origin: string): Promise<void> {
+  const key = `branding:${origin}`;
+  await chrome.storage.local.remove(key);
 }

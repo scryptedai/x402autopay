@@ -61,6 +61,9 @@ const elements = {
   statusLabel: document.getElementById("status-label") as HTMLElement,
   settingsForm: document.getElementById("settings-form") as HTMLFormElement,
   promptToggle: document.getElementById("prompt-toggle") as HTMLInputElement,
+  websiteBranding: document.getElementById("website-branding") as HTMLElement,
+  websiteIcon: document.getElementById("website-icon") as HTMLImageElement,
+  websiteDomain: document.getElementById("website-domain") as HTMLElement,
 } as const;
 
 async function loadState() {
@@ -72,7 +75,53 @@ async function loadState() {
     state.balances = balancesResponse.balances as Record<ChainId, BalanceCache>;
     state.balance = state.balances[state.settings.chain] ?? state.balance;
   }
+  
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tabs[0]?.url) {
+      const url = new URL(tabs[0].url);
+      if (url.protocol === "http:" || url.protocol === "https:") {
+        chrome.runtime.sendMessage({
+          type: "x402:detectBranding",
+          origin: url.origin,
+          tabId: tabs[0].id,
+        }).then((response) => {
+          if (response?.branding) {
+            displayWebsiteBranding(url.origin, response.branding);
+          } else {
+            displayWebsiteBranding(url.origin, null);
+          }
+        }).catch(() => {
+          displayWebsiteBranding(url.origin, null);
+        });
+      } else {
+        elements.websiteBranding.classList.add("hidden");
+      }
+    } else {
+      elements.websiteBranding.classList.add("hidden");
+    }
+  } catch {
+    elements.websiteBranding.classList.add("hidden");
+  }
+  
   render();
+}
+
+function displayWebsiteBranding(origin: string, branding: { logo?: string; logoDataUri?: string } | null) {
+  try {
+    const url = new URL(origin);
+    const domain = url.hostname;
+    elements.websiteBranding.classList.remove("hidden");
+    elements.websiteDomain.textContent = domain;
+    if (branding?.logoDataUri || branding?.logo) {
+      elements.websiteIcon.src = branding.logoDataUri || branding.logo || "";
+      elements.websiteIcon.classList.remove("hidden");
+    } else {
+      elements.websiteIcon.classList.add("hidden");
+    }
+  } catch {
+    elements.websiteBranding.classList.add("hidden");
+  }
 }
 
 function render() {
