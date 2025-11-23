@@ -29,6 +29,7 @@ window.addEventListener("message", (event: MessageEvent) => {
         throw new Error("chrome.runtime.sendMessage unavailable");
       }
       const result = await chrome.runtime.sendMessage(data.payload);
+      console.log("x402-autopay: bridge received result", { requestId: data.requestId, result });
       if (controller.signal.aborted) return;
       window.postMessage(
         {

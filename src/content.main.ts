@@ -38,7 +38,7 @@ async function runtimeSendMessage<T = unknown>(payload: unknown): Promise<T> {
         console.warn("x402-autopay: runtimeSendMessage error", { requestId, error: data.error });
         reject(new Error(data.error));
       } else {
-        console.log("x402-autopay: runtimeSendMessage result", { requestId });
+        console.log("x402-autopay: runtimeSendMessage result", { requestId, result: data.result });
         resolve(data.result as T);
       }
     };
@@ -64,14 +64,22 @@ async function handleResponse(
   requestMeta: ReturnType<typeof normalizeRequest>,
   originalArgs: FetchArgs,
 ): Promise<Response> {
-  console.info("x402-autopay: handleResponse", {
-    status: response.status,
-    type: response.type,
-    url: (response.url || (typeof requestMeta.input === "string" ? requestMeta.input : String(requestMeta.input))),
-  });
+  const hasPaymentHeader =
+    requestMeta.headers.has("X-PAYMENT") || requestMeta.headers.has("x-payment");
+  
+  if (hasPaymentHeader) {
+    await processSettlement(response, Object.fromEntries(requestMeta.headers.entries()));
+    return response;
+  }
+
   if (!isX402ResponseStatus(response.status)) {
     return response;
   }
+
+  console.info("x402-autopay: handleResponse 402", {
+    status: response.status,
+    url: (response.url || (typeof requestMeta.input === "string" ? requestMeta.input : String(requestMeta.input))),
+  });
 
   const url =
     response.url && response.url !== ""
@@ -127,6 +135,7 @@ async function handleResponse(
       type: "x402:challenge",
       challenge,
     });
+    console.log("x402-autopay: received resolution", resolution);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     if (errorMessage.includes("Extension context invalidated")) {
@@ -138,12 +147,15 @@ async function handleResponse(
   }
 
   if (!resolution) {
+    console.warn("x402-autopay: No resolution received from background worker");
     return response;
   }
 
   if (resolution.action === "deny" || resolution.action === "error") {
     if (resolution.action === "error" && resolution.message) {
       console.warn("x402-autopay: Challenge rejected", resolution.message);
+    } else {
+      console.warn("x402-autopay: Challenge denied or error", resolution);
     }
     return response;
   }
@@ -167,8 +179,7 @@ async function handleResponse(
         const result = message.resolution;
         if (result?.action === "retry" && result.retryHeaders) {
           retryWithHeaders(result.retryHeaders)
-            .then(async (retried) => {
-              await processSettlement(retried, result.retryHeaders ?? {});
+            .then((retried) => {
               resolve(retried);
             })
             .catch((error) => {
@@ -184,9 +195,7 @@ async function handleResponse(
   }
 
   if (resolution.action === "retry" && resolution.retryHeaders) {
-    const retried = await retryWithHeaders(resolution.retryHeaders);
-    await processSettlement(retried, resolution.retryHeaders);
-    return retried;
+    return await retryWithHeaders(resolution.retryHeaders);
   }
 
   return response;

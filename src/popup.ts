@@ -114,9 +114,9 @@ async function loadState() {
   
   chrome.runtime.sendMessage({ type: "x402:refreshAllBalances" })
     .then((balancesResponse) => {
-      if (balancesResponse?.balances) {
-        state.balances = balancesResponse.balances as Record<ChainId, BalanceCache>;
-        state.balance = state.balances[state.settings.chain] ?? state.balance;
+  if (balancesResponse?.balances) {
+    state.balances = balancesResponse.balances as Record<ChainId, BalanceCache>;
+    state.balance = state.balances[state.settings.chain] ?? state.balance;
         renderBalances(state.balances);
       }
     })
@@ -421,7 +421,7 @@ elements.settingsClose.addEventListener("click", () => {
 
 elements.backupWallet.addEventListener("click", () => {
   if (!state.wallet || !state.wallet.encryptedPrivateKey) return;
-  resetBackupUI();
+    resetBackupUI();
   elements.backupModal.classList.remove("hidden");
   setTimeout(() => elements.backupPassphrase.focus(), 0);
 });
@@ -591,9 +591,9 @@ elements.removeWallet.addEventListener("click", () => {
     `This will permanently delete the wallet. Type "${addressToConfirm}" to confirm:`,
     addressToConfirm,
     async () => {
-      await chrome.runtime.sendMessage({ type: "x402:updateWallet", wallet: null });
+  await chrome.runtime.sendMessage({ type: "x402:updateWallet", wallet: null });
       elements.settingsModal.classList.add("hidden");
-      await loadState();
+  await loadState();
     }
   );
 });

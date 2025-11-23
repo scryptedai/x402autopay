@@ -582,13 +582,25 @@ async function handleChallenge(
   const state = await getState();
   const mappedChain = mapChainId(challenge.chainId);
   
+  console.info("x402-autopay:bg handleChallenge", {
+    challengeChainId: challenge.chainId,
+    mappedChain,
+    selectedChain: state.settings.chain,
+    hasWallet: !!state.wallet,
+  });
+  
   if (!mappedChain) {
+    console.warn("x402-autopay:bg unsupported chain", challenge.chainId);
     return { action: "error", message: "Unsupported chain" };
   }
   
   if (mappedChain !== state.settings.chain) {
     const chainName = mappedChain === "polygon" ? "Polygon Mainnet" : "Polygon Amoy Testnet";
     const selectedName = state.settings.chain === "polygon" ? "Polygon Mainnet" : "Polygon Amoy Testnet";
+    console.warn("x402-autopay:bg chain mismatch", {
+      challengeChain: chainName,
+      selectedChain: selectedName,
+    });
     return {
       action: "error",
       message: `Challenge is for ${chainName}, but ${selectedName} is selected. Please switch networks in settings.`,
@@ -891,9 +903,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sender: sender?.tab?.url ?? sender?.origin ?? null,
   });
   if (message.type === "x402:challenge") {
+    console.info("x402-autopay:bg received challenge", {
+      chainId: message.challenge?.chainId,
+      amountUsd: message.challenge?.amountUsd,
+    });
     handleChallenge(message.challenge, sender)
-      .then(sendResponse)
+      .then((resolution) => {
+        console.info("x402-autopay:bg challenge resolution", resolution);
+        sendResponse(resolution);
+      })
       .catch((error: unknown) => {
+        console.error("x402-autopay:bg challenge error", error);
         sendResponse({ action: "error", message: String(error) });
       });
     return true;
