@@ -419,6 +419,18 @@ function shouldAutoApprove(state: Awaited<ReturnType<typeof getState>>, challeng
     return false;
   }
 
+  const mappedChain = mapChainId(challenge.chainId);
+  if (mappedChain && mappedChain === state.settings.chain) {
+    const chainBalance = state.balances?.[mappedChain];
+    if (chainBalance) {
+      const balanceAtomic = BigInt(chainBalance.rawBalance || "0");
+      const requiredAtomic = BigInt(challenge.amountAtomic || "0");
+      if (balanceAtomic < requiredAtomic) {
+        return false;
+      }
+    }
+  }
+
   return true;
 }
 
@@ -569,16 +581,21 @@ async function handleChallenge(
 ): Promise<ChallengeResolution> {
   const state = await getState();
   const mappedChain = mapChainId(challenge.chainId);
-  if (mappedChain && mappedChain !== state.settings.chain) {
-    await updateSettings({ chain: mappedChain });
-    state.settings = {
-      ...state.settings,
-      chain: mappedChain,
-    } satisfies ExtensionSettings;
+  
+  if (!mappedChain) {
+    return { action: "error", message: "Unsupported chain" };
   }
-  if (mappedChain) {
-    refreshBalance(true, mappedChain).catch(() => undefined);
+  
+  if (mappedChain !== state.settings.chain) {
+    const chainName = mappedChain === "polygon" ? "Polygon Mainnet" : "Polygon Amoy Testnet";
+    const selectedName = state.settings.chain === "polygon" ? "Polygon Mainnet" : "Polygon Amoy Testnet";
+    return {
+      action: "error",
+      message: `Challenge is for ${chainName}, but ${selectedName} is selected. Please switch networks in settings.`,
+    };
   }
+  
+  refreshBalance(true, mappedChain).catch(() => undefined);
   
   const branding = await processBranding(challenge, sender.tab?.id);
   if (branding) {

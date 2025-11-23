@@ -96,11 +96,31 @@ async function loadState() {
   const response = await chrome.runtime.sendMessage({ type: "x402:getState" });
   Object.assign(state, structuredClone(INITIAL_STATE), response as State);
   state.balance = state.balances?.[state.settings.chain] ?? state.balance;
-  const balancesResponse = await chrome.runtime.sendMessage({ type: "x402:refreshAllBalances" });
-  if (balancesResponse?.balances) {
-    state.balances = balancesResponse.balances as Record<ChainId, BalanceCache>;
-    state.balance = state.balances[state.settings.chain] ?? state.balance;
-  }
+  
+  render();
+  
+  chrome.runtime.sendMessage({ type: "x402:refreshBalance", chain: state.settings.chain })
+    .then((balanceResponse) => {
+      if (balanceResponse?.balance) {
+        state.balances = {
+          ...state.balances,
+          [state.settings.chain]: balanceResponse.balance,
+        };
+        state.balance = balanceResponse.balance;
+        renderBalances(state.balances);
+      }
+    })
+    .catch(() => undefined);
+  
+  chrome.runtime.sendMessage({ type: "x402:refreshAllBalances" })
+    .then((balancesResponse) => {
+      if (balancesResponse?.balances) {
+        state.balances = balancesResponse.balances as Record<ChainId, BalanceCache>;
+        state.balance = state.balances[state.settings.chain] ?? state.balance;
+        renderBalances(state.balances);
+      }
+    })
+    .catch(() => undefined);
   
   try {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -129,8 +149,6 @@ async function loadState() {
   } catch {
     elements.websiteBranding.classList.add("hidden");
   }
-  
-  render();
 }
 
 function displayWebsiteBranding(origin: string, branding: { logo?: string; logoDataUri?: string } | null) {
@@ -256,7 +274,7 @@ function renderWallet(wallet?: WalletData) {
   elements.walletAddressTruncated.textContent = truncated;
   elements.walletAddressFull.textContent = wallet.address;
 
-  resolveWalletEns(wallet.address);
+  resolveWalletEns(wallet.address).catch(() => undefined);
 
   const unlocked = typeof wallet.lockedUntil === "number" && wallet.lockedUntil > now;
   const secured = Boolean(wallet.encryptedPrivateKey);

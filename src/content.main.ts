@@ -1,4 +1,4 @@
-import type { ChallengeDetails } from "./shared/types";
+import type { ChallengeDetails, ChallengeResolution } from "./shared/types";
 import { parseChallengeHeaders, isX402ResponseStatus } from "./shared/x402";
 
 type FetchArgs = [input: RequestInfo | URL, init?: RequestInit];
@@ -121,16 +121,30 @@ async function handleResponse(
   console.log("x402-autopay: parsed challenge", challenge);
   console.log("x402-autopay: sending challenge message");
 
-  const resolution = await runtimeSendMessage({
-    type: "x402:challenge",
-    challenge,
-  });
+  let resolution: ChallengeResolution | null = null;
+  try {
+    resolution = await runtimeSendMessage({
+      type: "x402:challenge",
+      challenge,
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage.includes("Extension context invalidated")) {
+      console.warn("x402-autopay: Extension was reloaded. Please refresh the page.");
+      return response;
+    }
+    console.error("x402-autopay: Failed to process challenge", error);
+    return response;
+  }
 
   if (!resolution) {
     return response;
   }
 
   if (resolution.action === "deny" || resolution.action === "error") {
+    if (resolution.action === "error" && resolution.message) {
+      console.warn("x402-autopay: Challenge rejected", resolution.message);
+    }
     return response;
   }
 

@@ -43,7 +43,22 @@ async function loadChallenge() {
   const { challenge } = entry;
   const policy = state.policies[challenge.origin];
   const challengeChain = mapChainId(challenge.chainId);
-  const chainBalance = challengeChain ? state.balances?.[challengeChain] : undefined;
+  
+  if (!challengeChain) {
+    elements.status.textContent = "Unsupported chain";
+    elements.approve.disabled = true;
+    return;
+  }
+  
+  if (challengeChain !== state.settings.chain) {
+    const chainName = challengeChain === "polygon" ? "Polygon Mainnet" : "Polygon Amoy Testnet";
+    const selectedName = state.settings.chain === "polygon" ? "Polygon Mainnet" : "Polygon Amoy Testnet";
+    elements.status.textContent = `Challenge is for ${chainName}, but ${selectedName} is selected.`;
+    elements.approve.disabled = true;
+    return;
+  }
+  
+  const chainBalance = state.balances?.[challengeChain] ?? state.balances?.[state.settings.chain];
 
   elements.site.textContent = challenge.origin;
   elements.endpoint.textContent = `${challenge.method} ${challenge.endpoint}`;
